@@ -55,7 +55,7 @@ def on_message(client, userdata, message):
     #print("message topic=",message.topic)
     #print("message qos=",message.qos)
     #print("message retain flag=",message.retain)
-    
+
     value = int(float(message.payload.decode("utf-8")))
 
     if "MaxPower" in message.topic:
@@ -67,17 +67,18 @@ def on_message(client, userdata, message):
       else:
         SetPower = value
 
-    if SetPower > 0:
-      setSoyoPowerData(SetPower)
-      print("Soyo limiter set to ", SetPower, " Watt (act. ", value, "/max. ", on_message.MaxPower, ") > ", soyo_power_data)
-    else:
-      SetPower = 0
-      setSoyoPowerData(SetPower)
-      print("Soyo limiter set to 0")
+      if True:
+        if SetPower > 0:
+          setSoyoPowerData(SetPower)
+          print("Soyo limiter set to ", SetPower, " Watt (act. ", value, "/max. ", on_message.MaxPower, ") > ", soyo_power_data)
+        else:
+          SetPower = 0
+          setSoyoPowerData(SetPower)
+          print("Soyo limiter set to 0")
 
-    client.publish("PowerStation/SoyoSource/ActPower", SetPower)
+      client.publish("PowerStation/SoyoSource/ActPower", SetPower)
 
-    on_message.LastPower = SetPower
+      on_message.LastPower = SetPower
 
     GPIO.output(LED, GPIO.HIGH)
 ########################################
@@ -117,11 +118,14 @@ print("Subscribing to topic","PowerStation/SoyoSource/MaxPower")
 client.subscribe("PowerStation/SoyoSource/MaxPower")
 client.publish("PowerStation/SoyoSource/MaxPower", MAX_POWER)
 
+setSoyoPowerData(0)
+
 while True:
 
   print("SEND alive...");
   client.publish("PowerStation/SoyoSource/TimeStamp", int(time.time()));
-  
-  ser.write(soyo_power_data)
 
-  time.sleep(1) # wait 1 sec
+  if ser.isOpen():
+    ser.write(soyo_power_data)
+
+  time.sleep(2) # wait 1 sec
