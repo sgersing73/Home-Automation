@@ -9,20 +9,23 @@ import logging
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 
-LED = 16
-MAX_POWER = 500
-INSTANCE = "PowerStation"
-BROKER = "192.168.178.230"
-USER = "iobroker"
-PASSWD = "1evweiden1985"
+LED = 16                    # GPIO Port der onboard Status-LED
+MAX_POWER = 500             # Max 500W Einspeiseleistung
 
+######  MQTT Client settings
+INSTANCE = "PowerStation"   # Instance Name
+BROKER = "192.168.178.230"  # IP-Adresse
+USER = "iobroker"           # Benutzername
+PASSWD = "xxxxxxxxxxxxx"    # Password
+
+##### RS484 Port Settings
 PORT = "/dev/ttyUSB0"
 BAUDRATE = 4800
 
-soyo_power_data = [b'\x24', b'\x56', b'\x00', b'\x21', b'\x00', b'\x00', b'\x80'                                                                             , b'\x08']
+soyo_power_data = [b'\x24', b'\x56', b'\x00', b'\x21', b'\x00', b'\x00', b'\x80', b'\x08']
 
-GPIO.setwarnings(False)  # Ignore warning for now
-GPIO.setmode(GPIO.BCM)   # Use physical pin numbering
+GPIO.setwarnings(False)     # Ignore warning for now
+GPIO.setmode(GPIO.BCM)      # Use physical pin numbering
 GPIO.setup(LED, GPIO.OUT, initial=GPIO.LOW)
 
 def setSoyoPowerData(power):
@@ -33,7 +36,7 @@ def setSoyoPowerData(power):
     soyo_power_data[4] = power >> 8
     soyo_power_data[5] = power & 255
     soyo_power_data[6] = 128
-    soyo_power_data[7] = calc_checksumme(soyo_power_data[1], soyo_power_data[2],                                                                              soyo_power_data[3], soyo_power_data[4], soyo_power_data[5], soyo_power_data[6])
+    soyo_power_data[7] = calc_checksumme(soyo_power_data[1], soyo_power_data[2],soyo_power_data[3], soyo_power_data[4], soyo_power_data[5], soyo_power_data[6])
 
 def calc_checksumme(b1, b2, b3, b4, b5, b6):
     calc = (255 - b1 - b2 - b3 - b4 - b5 - b6) % 256
@@ -79,7 +82,7 @@ def on_message(client, userdata, message):
         SetPower = on_message.MaxPower
       else:
         SetPower =  on_message.LastPower + value
-
+        
         if SetPower > on_message.MaxPower:
           SetPower = on_message.MaxPower
         if SetPower < 0:
