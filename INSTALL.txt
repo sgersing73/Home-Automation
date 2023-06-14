@@ -1,0 +1,10 @@
+-- CRON configuration
+
+crontab -e
+
+# m h  dom mon dow   command
+@reboot /usr/bin/python3 -u /home/pi/Home-Automation/Powerstation/Scripts/Epever_ModbusToMqtt.py > /home/pi/Home-Automation/Powerstation/Logs/Epever_ModbusToMqtt_`date +\%Y\%$
+@reboot /usr/bin/python3 -u /home/pi/Home-Automation/Powerstation/Scripts/Soyo_PowerTransmitter.py > /home/pi/Home-Automation/Powerstation/Logs/Soyo_PowerTransmitter_`date +\$
+@reboot /usr/bin/python3 -u /home/pi/Home-Automation/Powerstation/Scripts/S0_Transmitter.py > /home/pi/Home-Automation/Powerstation/Logs/S0_Transmitter_`date +\%Y\%m\%d\%H\%M$
+@reboot /usr/bin/python3 -u /home/pi/Home-Automation/Powerstation/Scripts/Keep_Alive.py > /home/pi/Home-Automation/Powerstation/Logs/Keep_Alive_`date +\%Y\%m\%d\%H\%M\%S`.log
+@reboot /usr/bin/python3 -u /home/pi/Home-Automation/Powerstation/Scripts/Soyo_DataToMqtt.py >  /home/pi/Home-Automation/Powerstation/Logs/Soyo_DataToMqtt_`date +\%Y\%m\%d\%H$
