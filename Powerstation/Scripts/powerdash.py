@@ -6,6 +6,7 @@ import paho.mqtt.client as mqtt
 import time
 import RPi.GPIO as GPIO
 import drivers
+from encoder import Encoder
 
 Power = 0
 ActPower = 0
@@ -20,17 +21,34 @@ PVCurrent1 = 0
 PVCurrent2 = 0
 PVCurrent3 = 0
 A_input = 0
+Day = 0
+Week = 0
+Month = 0
+Year = 0
 
 bar_repr = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
+def valueChanged(value, direction):
+    #print("* New value: {}, Direction: {}".format(value, direction))
+    if direction == 'L':
+      print(client.publish("PowerStation/SoyoSource/MaxPower", MaxPower - 10))
+      print(MaxPower - 10)
+    if direction == 'R':
+      print(client.publish("PowerStation/SoyoSource/MaxPower", MaxPower + 10))
+      print(MaxPower + 10)
+
 def signal_handler(sig, frame):
     client.loop_stop() #stop the loop
-    print('by, by...')
+    display1.lcd_clear()
+    display2.lcd_clear()
+    display3.lcd_clear()
+    display4.lcd_clear()
+#    print('by, by...')
     sys.exit(0)
 
 def on_message(client, userdata, message):
 
-#    print(">> message received=", message.payload.decode("utf-8"))
+    print(">> message received=", message.payload.decode("utf-8"))
 #    print(">> message topic=",message.topic)
     global Power
     global ActPower
@@ -45,6 +63,10 @@ def on_message(client, userdata, message):
     global PVCurrent2
     global PVCurrent3
     global A_input
+    global Day
+    global Week
+    global Month
+    global Year
 
     if (message.payload.decode("utf-8") != ""):
       value = float(message.payload.decode("utf-8"))
@@ -53,39 +75,38 @@ def on_message(client, userdata, message):
 
     if "SetPower" in message.topic:
       Power = value
-
-    if "Produced" in message.topic:
+    elif "Produced" in message.topic:
       Produced = value
-
-    if "BatSOC" in message.topic:
+    elif "BatSOC" in message.topic:
       BatSOC = value
-
-    if "BatVoltage" in message.topic:
+    elif "BatVoltage" in message.topic:
       BatVoltage = value
-
-    if "1/PVVoltage" in message.topic:
+    elif "1/PVVoltage" in message.topic:
       PVVoltage1 = value
-
-    if "1/PVCurrent" in message.topic:
+    elif "1/PVCurrent" in message.topic:
       PVCurrent1 = value
-
-    if "2/PVVoltage" in message.topic:
+    elif "2/PVVoltage" in message.topic:
       PVVoltage2 = value
-
-    if "2/PVCurrent" in message.topic:
+    elif "2/PVCurrent" in message.topic:
       PVCurrent2 = value
-
-    if "A_input" in message.topic:
+    elif "3/PVVoltage" in message.topic:
+      PVVoltage3 = value
+    elif "3/PVCurrent" in message.topic:
+      PVCurrent3 = value
+    elif "A_input" in message.topic:
       A_input = value
-
-    if "ActPower" in message.topic:
+    elif "ActPower" in message.topic:
       ActPower = value
-
-    if "MaxPower" in message.topic:
+    elif "MaxPower" in message.topic:
       MaxPower = value
-
-    display()
-
+    elif "Day" in message.topic:
+      Day = value
+    elif "Week" in message.topic:
+      Week = value
+    elif "Month" in message.topic:
+      Month = value
+    elif "Year" in message.topic:
+      Year = value
 
 def display():
 
@@ -125,10 +146,10 @@ def display():
 
   # Print the string to display:
 
-  display1.lcd_display_string("C:{0:>5.1f}W T:{1:>2.1f}kWh".format(Power, Produced), 1)
+  display1.lcd_display_string("C:{0:>5.1f}W T:{1:>2.0f}kWh".format(Power, Produced), 1)
   display1.lcd_display_string("A:{0:>3.0f}W   M:{1:>3.0f}W".format(ActPower, MaxPower), 2)
- # display2.lcd_display_string(str() + "V", 1)
- # display2.lcd_display_string(str(value) + "A", 2)
+  display2.lcd_display_string("D:{0:>3.0f} W:{1:>4.0f} kWh".format(Day, Week), 1)
+  display2.lcd_display_string("M:{0:>3.0f} Y:{1:>4.0f} kWh".format(Month, Year), 2)
   display3.lcd_display_string("{0:>4.1f} {1:>4.1f} {2:>4.1f} V".format(PVVoltage1, PVVoltage2, PVVoltage3), 1)
   display3.lcd_display_string("{0:>4.1f} {1:>4.1f} {2:>4.1f} A".format(PVCurrent1, PVCurrent2, PVCurrent3), 2)
   display4.lcd_display_string("L:{0:>4.1f}A    {1:>4.1f}V".format(A_input, BatVoltage), 1)
@@ -141,10 +162,10 @@ display2 = drivers.Lcd(0x25)
 display3 = drivers.Lcd(0x26)
 display4 = drivers.Lcd(0x27)
 
-# Create object with custom characters data
+# Create an object with custom characters data
 cc = drivers.CustomCharacters(display4)
 
-# Redefine the default characters that will be used to create process bar:
+# Redefine the default characters that will be used to create the process bar:
 # Left full character. Code {0x00}.
 cc.char_1_data = ["01111", "11000", "10011", "10111", "10111", "10011", "11000", "01111"]
 
@@ -172,12 +193,14 @@ signal.signal(signal.SIGINT, signal_handler)
 client = mqtt.Client("PowerDash") #create new instance
 client.on_message=on_message #attach function to callback
 
-print("connecting to broker")
-client.username_pw_set("iobroker", "x")
-client.connect("192.168.178.x") #connect to broker
+#print("connecting to broker")
+client.username_pw_set("iobroker", "xxxx")
+client.connect("192.168.178.230") #connect to broker
 
-client.loop_start() #start the loop
-
+client.subscribe("PowerStation/Feed/Day")
+client.subscribe("PowerStation/Feed/Week")
+client.subscribe("PowerStation/Feed/Month")
+client.subscribe("PowerStation/Feed/Year")
 client.subscribe("PowerStation/SoyoSource/SetPower")
 client.subscribe("PowerStation/SoyoSource/MaxPower")
 client.subscribe("PowerStation/SoyoSource/ActPower")
@@ -188,8 +211,18 @@ client.subscribe("PowerStation/Epever/1/PVVoltage")
 client.subscribe("PowerStation/Epever/1/PVCurrent")
 client.subscribe("PowerStation/Epever/2/PVVoltage")
 client.subscribe("PowerStation/Epever/2/PVCurrent")
+client.subscribe("PowerStation/Epever/3/PVCurrent")
+client.subscribe("PowerStation/Epever/3/PVVoltage")
+client.subscribe("PowerStation/Epever/3/PVCurrent")
 client.subscribe("PowerStation/Soyo/A_input")
 
+client.loop_start() #start the loop
+
+GPIO.setmode(GPIO.BCM)
+e1 = Encoder(21, 20, valueChanged)
+
 while True:
+
+  display()
 
   time.sleep(1) # wait 1 sec
