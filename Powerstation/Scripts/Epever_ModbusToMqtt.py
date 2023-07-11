@@ -8,47 +8,84 @@ import paho.mqtt.client as mqtt
 import time
 import RPi.GPIO as GPIO
 import serial
-import logging
 
 def signal_handler(sig, frame):
-
     client.loop_stop() #stop the loop
-    print('by, by...')
+    print(time.strftime("%y%m%d%H%M%S") + "by, by...")
     sys.exit(0)
 
+FIRST_RECONNECT_DELAY = 1
+RECONNECT_RATE = 2
+MAX_RECONNECT_COUNT = 12
+MAX_RECONNECT_DELAY = 60
+
+DELAY = 10
+
+def on_disconnect(client, userdata, rc):
+    print("Disconnected with result code: %s", rc)
+    reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
+    while reconnect_count < MAX_RECONNECT_COUNT:
+        print("Reconnecting in %d seconds...", reconnect_delay)
+        time.sleep(reconnect_delay)
+
+        try:
+            client.reconnect()
+            print("Reconnected successfully!")
+
+            #client.subscribe("PowerStation/Epever/1/BatVoltage")
+            #client.subscribe("PowerStation/Epever/1/TimeStamp")
+
+            client.loop_start() #start the loop
+            return
+        except Exception as err:
+            print("%s. Reconnect failed. Retrying...", err)
+
+        reconnect_delay *= RECONNECT_RATE
+        reconnect_delay = min(reconnect_delay, MAX_RECONNECT_DELAY)
+        reconnect_count += 1
+    print("Reconnect failed after %s attempts. Exiting...", reconnect_count)
+
+
+def on_connect(client, userdata, flags, rc):
+        if rc == 0:
+            print("Connected to MQTT Broker!")
+        else:
+            print("Failed to connect, return code %d\n", rc)
+
 def on_message(client, userdata, message):
-
-    logging.info(">> message received=%s", message.payload.decode("utf-8"))
-    logging.info(">> message topic=%s",message.topic)
-
-def f():
-    excs = [OSError('error 1'), SystemError('error 2')]
-    raise ExceptionGroup('there were problems', excs)
+    print(time.strftime("%y%m%d%H%M%S") + " >> message received=", message.payload.decode("utf-8"))
+    print(time.strftime("%y%m%d%H%M%S") + " >> message topic=",message.topic)
 
 signal.signal(signal.SIGINT, signal_handler)
 
-logging.debug("creating new instance")
-client = mqtt.Client(config.INSTANCE + "1") #create new instance
+print(time.strftime("%y%m%d%H%M%S") + " creating new instance")
+client = mqtt.Client("EpeverModbusToMqtt") #create new instance
 client.on_message=on_message #attach function to callback
 
-logging.debug("connecting to broker")
+print(time.strftime("%y%m%d%H%M%S") + " connecting to broker")
 client.username_pw_set(config.USER, config.PASSWD)
+client.on_connect = on_connect
+client.on_disconnect = on_disconnect
 client.connect(config.BROKER) #connect to broker
+
+print("start loop")
+client.loop_start()
 
 # Set to true to edit values
 WRITE = False
 
-instrument = minimalmodbus.Instrument("/dev/ttyUSB1", 1)
+instrument = minimalmodbus.Instrument("/dev/ttyUSB0", 2)
 # port name, slave address (in decimal)
 
 instrument.serial.baudrate = 115200  # Baud
 instrument.serial.bytesize = 8
 instrument.serial.parity = serial.PARITY_NONE
 instrument.serial.stopbits = 1
-instrument.serial.timeout = 1  # seconds
+instrument.serial.timeout = 0.2  # seconds
 
 instrument.mode = minimalmodbus.MODE_RTU  # rtu or ascii mode
 instrument.clear_buffers_before_each_transaction = True
+instrument.close_port_after_each_call = True
 
 PV_VOLTAGE = 0x3100
 PV_CURRENT = 0x3101
@@ -67,6 +104,8 @@ BAT_SOC = 0x311A
 BAT_RATED_VOLTAGE = 0x9067
 BAT_STATE = 0x3200
 CHARGE_STATE = 0x3201
+GEN_ENERGY_TODAY = 0x330C
+GEN_ENERGY_TOTAL = 0x3312
 
 # Holding registers
 BAT_TYPE = 0x9000
@@ -84,190 +123,75 @@ UNDER_VOLTAGE_WARNING = 0x900C
 LOW_VOLTAGE_DISCONNECT = 0x900D
 DISCHARGING_LIMIT_VOLTAGE = 0x900E
 
-client.subscribe("PowerStation/Epever/1/BatVoltage")
-client.subscribe("PowerStation/Epever/1/TimeStamp")
+print(time.strftime("%y%m%d%H%M%S") + " starting main loop...")
+
+counter = 1
 
 while True:
 
-    time.sleep(1) 
+    if counter > 3:
+      counter = 1
+
+    instrument = minimalmodbus.Instrument("/dev/ttyUSB0", counter)
+
+    time.sleep(DELAY)
     try:
-        high_voltage_disconnect = instrument.read_register(HIGH_VOLTAGE_DISCONNECT, 2)
-        print("high_voltage_disconnect:", high_voltage_disconnect, "V")
-    except minimalmodbus.NoResponseError:
-        continue        
-    
-    time.sleep(1) 
-    try:
-        charging_limit_voltage = instrument.read_register(CHARGING_LIMIT_VOLTAGE, 2)
-        print("charging_limit_voltage:", charging_limit_voltage, "V")
-    except minimalmodbus.NoResponseError:
-        continue     
-    
-    time.sleep(1) 
-    try:    
-        over_voltage_reconnect = instrument.read_register(OVER_VOLTAGE_RECONNECT, 2)
-        print("over_voltage_reconnect:", over_voltage_reconnect, "V")
-    except minimalmodbus.NoResponseError:
-        continue     
-    
-    time.sleep(1) 
-    try:
-        equalization_voltage = instrument.read_register(EQUALIZATION_VOLTAGE, 2)
-        print("equalization_voltage:", equalization_voltage, "V")
-    except minimalmodbus.NoResponseError:
-        continue     
-    
-    time.sleep(1) 
-    try:
-        boost_voltage = instrument.read_register(BOOST_VOLTAGE, 2)
-        print("boost_voltage:", boost_voltage, "V")
-    except minimalmodbus.NoResponseError:
-        continue     
-            
-    time.sleep(1) 
-    try:
-        float_voltage = instrument.read_register(FLOAT_VOLTAGE, 2)
-        print("float_voltage:", float_voltage, "V")
-    except minimalmodbus.NoResponseError:
-        continue     
-    
-    time.sleep(1) 
-    try:    
-        boost_reconnect_voltage = instrument.read_register(BOOST_RECONNECT_VOLTAGE, 2)
-        print("boost_reconnect_voltage:", boost_reconnect_voltage, "V")
-    except minimalmodbus.NoResponseError:
-        continue     
-    
-    time.sleep(1) 
-    try:
-        low_voltage_reconnect = instrument.read_register(LOW_VOLTAGE_RECONNECT, 2)
-        print("low_voltage_reconnect:", low_voltage_reconnect, "V")
-    except minimalmodbus.NoResponseError:
-        continue     
-    
-    time.sleep(1) 
-    try:
-        under_voltage_recover = instrument.read_register(UNDER_VOLTAGE_RECOVER, 2)
-        print("under_voltage_recover:", under_voltage_recover, "V")
+        value = instrument.read_register(GEN_ENERGY_TODAY, 0, 4, False) / 100
+        print(time.strftime("%y%m%d%H%M%S") + " Slave: " + str(counter) + " GEN_ENERGY_TODAY:\t" + str(value) + "KWh")
+        client.publish("PowerStation/Epever/" + str(counter) + "/GenEnergyToday", str(value))
     except minimalmodbus.NoResponseError:
         continue
-        
-    time.sleep(1) 
-    try:
-        under_voltage_warning = instrument.read_register(UNDER_VOLTAGE_WARNING, 2)
-        print("under_voltage_warning:", under_voltage_warning, "V")
-    except minimalmodbus.NoResponseError:
-        continue        
-    
-    time.sleep(1) 
-    try:
-        low_voltage_disconnect = instrument.read_register(LOW_VOLTAGE_DISCONNECT, 2)
-        print("low_voltage_disconnect:", low_voltage_disconnect, "V")
-    except minimalmodbus.NoResponseError:
-        continue        
-    
-    time.sleep(1) 
-    try:    
-        discharging_limit_voltage = instrument.read_register(DISCHARGING_LIMIT_VOLTAGE, 2)
-        print("discharging_limit_voltage:", discharging_limit_voltage, "V")
-    except minimalmodbus.NoResponseError:
-        continue        
-    
-    # Print panel info
-    time.sleep(1) 
-    try:
-        pv_voltage = instrument.read_register(PV_VOLTAGE, 2, 4, False)  # Registernumber, number of decimals
-        print("Panel voltage:\t" + str(pv_voltage) + "V")
-    except minimalmodbus.NoResponseError:
-        continue        
 
-    time.sleep(1) 
+    time.sleep(DELAY)
     try:
-        pv_current = instrument.read_register(PV_CURRENT, 2, 4, False)  # Registernumber, number of decimals
-        print("Panel current:\t" + str(pv_current) + "A")
+        value = instrument.read_register(GEN_ENERGY_TOTAL, 0, 4, False) / 100
+        print(time.strftime("%y%m%d%H%M%S") + " Slave: " + str(counter) + " GEN_ENERGY_TOTAL:\t" + str(value) + "KWh")
+        client.publish("PowerStation/Epever/" + str(counter) + "/GenEnergyTotal", str(value))
     except minimalmodbus.NoResponseError:
-        continue        
+        continue
 
-    # Print battery info
-    time.sleep(1) 
+    time.sleep(DELAY)
     try:
         bat_voltage = instrument.read_register(BAT_VOLTAGE, 2, 4, False)  # Registernumber, number of decimals
-        print("Batt. voltage:\t" + str(bat_voltage) + "V")
-        client.publish("PowerStation/Epever/" + "1" + "/BatVoltage", bat_voltage)
+        print(time.strftime("%y%m%d%H%M%S") + " Slave: " + str(counter) + " Batt. voltage:\t" + str(bat_voltage) + "V")
+        client.publish("PowerStation/Epever/" + str(counter) + "/BatVoltage", bat_voltage)
     except minimalmodbus.NoResponseError:
-        continue        
- 
-    time.sleep(1) 
+        continue
+
+    time.sleep(DELAY)
     try:
         bat_soc = instrument.read_register(BAT_SOC, 0, 4, False)
-        print("Batt. SOC:\t" + str(bat_soc) + "%")
-        client.publish("PowerStation/Epever/" + "1" + "/BatSOC", str(bat_soc))
+        print(time.strftime("%y%m%d%H%M%S") + " Slave: " + str(counter) + " Batt. SOC:\t" + str(bat_soc) + "%")
+        client.publish("PowerStation/Epever/" + str(counter) + "/BatSOC", str(bat_soc))
     except minimalmodbus.NoResponseError:
-        continue        
+        continue
 
-    time.sleep(1) 
+
+    time.sleep(DELAY)
     try:
-        temperature = instrument.read_register(BAT_TEMP, 2, 4, False)  # Registernumber, number of decimals
-        print("Batt. temp:\t" + str(temperature) + "C")
+        value = instrument.read_register(PV_CURRENT, 2, 4, False)
+        print(time.strftime("%y%m%d%H%M%S") + " Slave: " + str(counter) + " PV Current:\t" + str(value) + "A")
+        client.publish("PowerStation/Epever/" + str(counter) + "/PVCurrent", str(value))
     except minimalmodbus.NoResponseError:
-        continue        
+        continue
 
-    if WRITE:
-      # Set battery type, 1 = Sealed
-      sealed = 1
-      instrument.write_register(BAT_TYPE, sealed, 0, functioncode=0x10, signed=False)
-      battery_type = instrument.read_register(BAT_TYPE, 0, 3, False)  # Registernumber, number of decimals
-
-      type_string = ""
-      if battery_type == 1:
-        type_string = "Sealed"
-      elif battery_type == 2:
-        type_string = "Gel"
-      elif battery_type == 3:
-        type_string = "Flooded"
-      elif battery_type == 0:
-        type_string = "User defined"
-      print("Battery type:\t" + type_string)
-
-    if WRITE:
-      # Set capacity
-      capacity = 75
-      instrument.write_register(BAT_CAPACITY, capacity, 0, functioncode=0x10, signed=False)
-
-    time.sleep(1) 
+    time.sleep(DELAY)
     try:
-        battery_capacity = instrument.read_register(BAT_CAPACITY, 0, 3, False)  # Registernumber, number of decimals
-        print("Battery capac.:\t" + str(battery_capacity) + "Ah")
+        value = instrument.read_register(PV_VOLTAGE, 2, 4, False)
+        print(time.strftime("%y%m%d%H%M%S") + " Slave: " + str(counter) + " PV Voltage:\t" + str(value) + "V")
+        client.publish("PowerStation/Epever/" + str(counter) + "/PVVoltage", str(value))
     except minimalmodbus.NoResponseError:
-        continue        
+        continue
 
-    if WRITE:
-      # Set battery voltage, 0 = auto detect, 1 = 12 V, 2 = 24V
-      v_auto = 0
-      v_12 = 1
-      v_24 = 2
-      instrument.write_register(BAT_RATED_VOLTAGE, v_12, 0, functioncode=0x10, signed=False)
 
-    time.sleep(1) 
+    time.sleep(DELAY)
     try:
-        battery_rated_volt = instrument.read_register(BAT_RATED_VOLTAGE, 0, 3, False)  # Registernumber, number of decimals
-       
-        if battery_rated_volt == 0:
-          volt_string = "autodetect"
-        else:
-          volt_string = str(12 * battery_rated_volt) + "V"
-        
-        print("System voltage:\t" + volt_string)
+        value = instrument.read_register(EQUIPMENT_TEMP, 2, 4, False)
+        print(time.strftime("%y%m%d%H%M%S") + " Slave: " + str(counter) + " Temp:\t" + str(value) + "C")
+        client.publish("PowerStation/Epever/" + str(counter) + "/EquipmentTemp", str(value))
     except minimalmodbus.NoResponseError:
-        continue        
+        continue
 
-    time.sleep(1) 
-    try:
-        val = instrument.read_register(0x900E, 2, 3, False)
-        print("Voltage configuration:\t" + str(val) + "V")
-    except minimalmodbus.NoResponseError:
-        continue        
+    client.publish("PowerStation/Epever/" + str(counter) + "/TimeStamp", int(time.time()))
 
-    client.publish("PowerStation/Epever/1/TimeStamp", int(time.time()))
-
-    time.sleep(10)
+    counter = counter + 1
