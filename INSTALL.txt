@@ -8,3 +8,49 @@ crontab -e
 @reboot /usr/bin/python3 -u /home/pi/Home-Automation/Powerstation/Scripts/S0_Transmitter.py > /home/pi/Home-Automation/Powerstation/Logs/S0_Transmitter_`date +\%Y\%m\%d\%H\%M$
 @reboot /usr/bin/python3 -u /home/pi/Home-Automation/Powerstation/Scripts/Keep_Alive.py > /home/pi/Home-Automation/Powerstation/Logs/Keep_Alive_`date +\%Y\%m\%d\%H\%M\%S`.log
 @reboot /usr/bin/python3 -u /home/pi/Home-Automation/Powerstation/Scripts/Soyo_DataToMqtt.py >  /home/pi/Home-Automation/Powerstation/Logs/Soyo_DataToMqtt_`date +\%Y\%m\%d\%H$
+
+-- SYSTEMD configuration
+
+Once you are done editing a demo_*.py file or writing your own Python script, follow the instructions on this section to run the script in the background. First, however, ensure that the script (e.g., script.py) has at least permission to be executed, as follows:
+
+sudo chmod +x script.py
+Similarly, file ownership can be configured via chown. For example, to set the user ${USER} as owner of the file script.py, run the following:
+
+sudo chown ${USER} script.py
+Systemd
+Use the following procedure to run any Python script as a (systemd) service:
+
+Create a new unit file in /lib/systemd/system/ called rpi-lcd.service:
+
+sudo nano /lib/systemd/system/rpi-lcd.service
+Copy and paste the following in the new unit file:
+
+(If your user is different than pi, remember to edit the User= entry.)
+
+[Unit]
+Description=RPi Python script for a 16x2 LCD
+
+[Service]
+Type=simple
+## Edit the following according to the script permissions
+User=pi
+#Group=users
+
+## Edit the following with the full path to the compatible Python version and your script
+ExecStart=/usr/bin/python /path/to/script.py
+
+Restart=always
+RestartSec=5
+
+KillMode=process
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target
+Enable the service and start it:
+
+sudo systemctl enable rpi-lcd.service
+sudo systemctl start rpi-lcd.service
+Check that the LCD is displaying the correct information; otherwise, check the service status:
+
+systemctl status rpi-lcd.service
