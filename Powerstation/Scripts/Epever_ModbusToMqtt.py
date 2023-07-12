@@ -6,6 +6,7 @@ import signal
 import sys
 import paho.mqtt.client as mqtt
 import time
+import binascii
 import RPi.GPIO as GPIO
 import serial
 
@@ -55,6 +56,10 @@ def on_connect(client, userdata, flags, rc):
 def on_message(client, userdata, message):
     print(time.strftime("%y%m%d%H%M%S") + " >> message received=", message.payload.decode("utf-8"))
     print(time.strftime("%y%m%d%H%M%S") + " >> message topic=",message.topic)
+
+def _convert2Bin(value):
+    convert = "{0:{fill}16b}".format(value, fill = '0')
+    return convert
 
 signal.signal(signal.SIGINT, signal_handler)
 
@@ -189,6 +194,22 @@ while True:
         value = instrument.read_register(EQUIPMENT_TEMP, 2, 4, False)
         print(time.strftime("%y%m%d%H%M%S") + " Slave: " + str(counter) + " Temp:\t" + str(value) + "C")
         client.publish("PowerStation/Epever/" + str(counter) + "/EquipmentTemp", str(value))
+    except minimalmodbus.NoResponseError:
+        continue
+
+    time.sleep(DELAY)
+    try:
+        value = instrument.read_register(CHARGE_STATE, 0, 4, False)
+        print(time.strftime("%y%m%d%H%M%S") + " Slave: " + str(counter) + " ChargeState:\t" + _convert2Bin(value) )
+        client.publish("PowerStation/Epever/" + str(counter) + "/ChargeState", _convert2Bin(value) )
+    except minimalmodbus.NoResponseError:
+        continue
+
+    time.sleep(DELAY)
+    try:
+        value = instrument.read_register(BAT_STATE, 0, 4, False)
+        print(time.strftime("%y%m%d%H%M%S") + " Slave: " + str(counter) + " BatState:\t" + _convert2Bin(value) )
+        client.publish("PowerStation/Epever/" + str(counter) + "/BatState", _convert2Bin(value) )
     except minimalmodbus.NoResponseError:
         continue
 
