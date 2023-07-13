@@ -213,7 +213,7 @@ client = mqtt.Client("PowerDash") #create new instance
 client.on_message=on_message #attach function to callback
 
 #print("connecting to broker")
-client.username_pw_set("iobroker", "1evweiden1985")
+client.username_pw_set("iobroker", "xxx")
 client.connect("192.168.178.230") #connect to broker
 
 client.subscribe("PowerStation/Feed/Day")
