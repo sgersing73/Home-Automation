@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import signal
+import time
 import sys
 import paho.mqtt.client as mqtt
 import time
@@ -146,14 +147,32 @@ def display():
 
   # Print the string to display:
 
-  display1.lcd_display_string("C:{0:>5.1f}W T:{1:>2.0f}kWh".format(Power, Produced), 1)
-  display1.lcd_display_string("A:{0:>3.0f}W   M:{1:>3.0f}W".format(ActPower, MaxPower), 2)
-  display2.lcd_display_string("D:{0:>3.0f} W:{1:>4.0f} kWh".format(Day, Week), 1)
-  display2.lcd_display_string("M:{0:>3.0f} Y:{1:>4.0f} kWh".format(Month, Year), 2)
-  display3.lcd_display_string("{0:>4.1f} {1:>4.1f} {2:>4.1f} V".format(PVVoltage1, PVVoltage2, PVVoltage3), 1)
-  display3.lcd_display_string("{0:>4.1f} {1:>4.1f} {2:>4.1f} A".format(PVCurrent1, PVCurrent2, PVCurrent3), 2)
-  display4.lcd_display_string("L:{0:>4.1f}A    {1:>4.1f}V".format(A_input, BatVoltage), 1)
-  display4.lcd_display_extended_string(bar_string + " {0}% ".format(BatSOC), 2)
+  line1 = "C:{0:>5.1f}W T:{1:>2.0f}kWh".format(Power, Produced)
+  line2 = "A:{0:>3.0f}W   M:{1:>3.0f}W".format(ActPower, MaxPower)
+  line3 = "D:{0:>3.0f} W:{1:>4.0f} kWh".format(Day, Week)
+  line4 = "M:{0:>3.0f} Y:{1:>4.0f} kWh".format(Month, Year)
+  line5 = "{0:>4.1f} {1:>4.1f} {2:>4.1f} V".format(PVVoltage1, PVVoltage2, PVVoltage3)
+  line6 = "{0:>4.1f} {1:>4.1f} {2:>4.1f} A".format(PVCurrent1, PVCurrent2, PVCurrent3)
+  line7 = "L:{0:>4.1f}A    {1:>4.1f}V".format(A_input, BatVoltage)
+  line8 = bar_string + " {0}% ".format(BatSOC)
+ 
+  display1.lcd_display_string(line1, 1)
+  display1.lcd_display_string(line2, 2)
+  display2.lcd_display_string(line3, 1)
+  display2.lcd_display_string(line4, 2)
+  display3.lcd_display_string(line5, 1)
+  display3.lcd_display_string(line6, 2)
+  display4.lcd_display_string(line7, 1)
+  display4.lcd_display_extended_string(line8, 2)
+
+  client.publish("PowerStation/Dashboard/Line1", line1);
+  client.publish("PowerStation/Dashboard/Line2", line2);
+  client.publish("PowerStation/Dashboard/Line3", line3);
+  client.publish("PowerStation/Dashboard/Line4", line4);
+  client.publish("PowerStation/Dashboard/Line5", line5);
+  client.publish("PowerStation/Dashboard/Line6", line6);
+  client.publish("PowerStation/Dashboard/Line7", line7);
+  client.publish("PowerStation/Dashboard/Line8", line8);
 
 ########################################
 
@@ -162,10 +181,10 @@ display2 = drivers.Lcd(0x25)
 display3 = drivers.Lcd(0x26)
 display4 = drivers.Lcd(0x27)
 
-# Create an object with custom characters data
+# Create object with custom characters data
 cc = drivers.CustomCharacters(display4)
 
-# Redefine the default characters that will be used to create the process bar:
+# Redefine the default characters that will be used to create process bar:
 # Left full character. Code {0x00}.
 cc.char_1_data = ["01111", "11000", "10011", "10111", "10111", "10011", "11000", "01111"]
 
@@ -194,7 +213,7 @@ client = mqtt.Client("PowerDash") #create new instance
 client.on_message=on_message #attach function to callback
 
 #print("connecting to broker")
-client.username_pw_set("iobroker", "xxxx")
+client.username_pw_set("iobroker", "1evweiden1985")
 client.connect("192.168.178.230") #connect to broker
 
 client.subscribe("PowerStation/Feed/Day")
@@ -224,5 +243,7 @@ e1 = Encoder(21, 20, valueChanged)
 while True:
 
   display()
+
+  client.publish("PowerStation/Dashboard/TimeStamp", int(time.time()));
 
   time.sleep(1) # wait 1 sec
